@@ -8,6 +8,9 @@ edition = "2018"
 near-sdk = "4.0.0-pre.9"
 near-contract-standards = "4.0.0-pre.9"
 
+[dev-dependencies]
+near-sdk-sim = "4.0.0-pre.9"
+
 ft = { path = "./ft" }
 
 [workspace]
