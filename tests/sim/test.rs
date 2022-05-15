@@ -28,4 +28,3 @@ fn simulate_simple_transfer() {
     assert_eq!(initial_balance - transfer_amount, root_balance.0);
     assert_eq!(transfer_amount, alice_balance.0);
 }
-

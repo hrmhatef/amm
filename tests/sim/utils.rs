@@ -4,7 +4,6 @@ use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata, F
 use near_sdk::serde_json::json;
 use near_sdk_sim::{deploy, init_simulator, to_yocto, ContractAccount, UserAccount};
 
-
 pub const FT_ID: &str = "token";
 
 // Load in contract bytes at runtime
@@ -28,13 +27,7 @@ pub fn register_user(contract_id: &str, user: &near_sdk_sim::UserAccount) {
     .assert_success();
 }
 
-pub fn init(
-    initial_balance: u128,
-) -> (
-    UserAccount,
-    ContractAccount<FTContract>,
-    UserAccount,
-) {
+pub fn init(initial_balance: u128) -> (UserAccount, ContractAccount<FTContract>, UserAccount) {
     let root = init_simulator(None);
     let meta = FungibleTokenMetadata {
         spec: FT_METADATA_SPEC.to_string(),
@@ -62,9 +55,5 @@ pub fn init(
     let rick = root.create_user("rick".parse().unwrap(), to_yocto("100"));
     register_user(FT_ID, &rick);
 
-    (
-        root,
-        token_contract,
-        rick
-    )
+    (root, token_contract, rick)
 }
