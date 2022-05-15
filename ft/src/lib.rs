@@ -17,7 +17,6 @@ pub struct FTContract {
 #[near_bindgen]
 impl FTContract {
     #[init]
-    #[allow(dead_code)]
     pub fn new_default_meta(owner_id: AccountId, total_supply: U128) -> Self {
         Self::new(
             owner_id,
@@ -35,7 +34,6 @@ impl FTContract {
     }
 
     #[init]
-    #[allow(dead_code)]
     pub fn new(owner_id: AccountId, total_supply: U128, metadata: FungibleTokenMetadata) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         metadata.assert_valid();
