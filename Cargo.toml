@@ -12,10 +12,12 @@ near-contract-standards = "4.0.0-pre.9"
 near-sdk-sim = "4.0.0-pre.9"
 
 ft = { path = "./ft" }
+amm = { path = "./amm" }
 
 [workspace]
 members = [
     "ft",
+    "amm",
 ]
 
 [profile.release]
