@@ -106,7 +106,7 @@ mod tests {
     use near_sdk::test_utils::accounts;
 
     #[test]
-    fn test_hatef() {
+    fn test_init() {
         let mut amm = AMM::new(accounts(0), accounts(1), accounts(2));
         assert!(amm.ft_metadata_a().is_err());
         assert!(amm.ft_metadata_b().is_err());
