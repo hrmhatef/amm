@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_contract_standards::fungible_token::FungibleToken;
-use near_sdk::{env, log, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseOrValue};
+use near_sdk::{env, log, near_bindgen, AccountId, PanicOnDefault};
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
@@ -192,14 +192,6 @@ impl AMM {
         self.token_b.1.as_ref()
     }
 
-    fn on_account_closed(&mut self, account_id: AccountId, balance: Balance) {
-        log!("Clsed @{} with {}", account_id, balance);
-    }
-
-    fn on_tokens_burned(&mut self, account_id: AccountId, amount: Balance) {
-        log!("Account @{} burned {}", account_id, amount);
-    }
-
     fn check_meta(&self) {
         if self.token_a().is_none() || self.token_b().is_none() {
             panic!("Please init the metadata of tokens")
@@ -227,16 +219,12 @@ impl From<FungibleTokenMetadata> for TokenInfo {
     }
 }
 
-near_contract_standards::impl_fungible_token_core!(AMM, token_amm, on_tokens_burned);
-near_contract_standards::impl_fungible_token_storage!(AMM, token_amm, on_account_closed);
-
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
     use super::*;
     use near_contract_standards::fungible_token::metadata::FT_METADATA_SPEC;
-    use near_sdk::test_utils::{accounts, VMContextBuilder};
-    use near_sdk::testing_env;
+    use near_sdk::test_utils::accounts;
 
     fn meta_a() -> FungibleTokenMetadata {
         FungibleTokenMetadata {
@@ -260,14 +248,6 @@ mod tests {
             decimals: 8,
         }
     }
-    fn get_context(predecessor_account_id: AccountId) -> VMContextBuilder {
-        let mut builder = VMContextBuilder::new();
-        builder
-            .current_account_id(accounts(0))
-            .signer_account_id(predecessor_account_id.clone())
-            .predecessor_account_id(predecessor_account_id);
-        builder
-    }
 
     #[test]
     fn test_init() {
@@ -286,10 +266,6 @@ mod tests {
                 decimals: 8
             }
         );
-        let mut context = get_context(rick_id);
-        testing_env!(context.build());
-        testing_env!(context.is_view(true).build());
-        assert_eq!(amm.ft_total_supply().0, 0);
     }
 
     #[test]
@@ -337,8 +313,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "Same token is not acceptable")]
     fn test_init_same_token_a_and_b() {
-        let context = get_context(accounts(0));
-        testing_env!(context.build());
         let rick_id = accounts(1);
         let token_a = accounts(2);
         let token_b = accounts(3);
@@ -350,8 +324,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "Same token is not acceptable")]
     fn test_init_same_token_b_and_a() {
-        let context = get_context(accounts(0));
-        testing_env!(context.build());
         let rick_id = accounts(1);
         let token_a = accounts(2);
         let token_b = accounts(3);
@@ -363,8 +335,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "Token not supported")]
     fn test_add_token_to_pool_zombie_token() {
-        let context = get_context(accounts(0));
-        testing_env!(context.build());
         let owner = accounts(1);
         let token_rick = accounts(2);
         let token_morty = accounts(3);
@@ -379,8 +349,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "Please init the metadata of tokens")]
     fn test_add_token_to_pool_not_init_tokens() {
-        let context = get_context(accounts(0));
-        testing_env!(context.build());
         let owner = accounts(1);
         let token_rick = accounts(2);
         let token_morty = accounts(3);
@@ -392,8 +360,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "Tokens can't be equals")]
     fn test_swap_same_tokens() {
-        let context = get_context(accounts(0));
-        testing_env!(context.build());
         let owner = accounts(1);
         let token_rick = accounts(2);
         let token_morty = accounts(3);
@@ -405,8 +371,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "Token not supported")]
     fn test_swap_not_supported() {
-        let context = get_context(accounts(0));
-        testing_env!(context.build());
         let owner = accounts(1);
         let token_rick = accounts(2);
         let token_morty = accounts(3);
