@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Token not supported")]
-    fn test_zombie_token() {
+    fn test_add_token_to_pool_zombie_token() {
         let context = get_context(accounts(0));
         testing_env!(context.build());
         let owner = accounts(1);
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Please init the metadata of tokens")]
-    fn test_not_init_tokens() {
+    fn test_add_token_to_pool_not_init_tokens() {
         let context = get_context(accounts(0));
         testing_env!(context.build());
         let owner = accounts(1);
