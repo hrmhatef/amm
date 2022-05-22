@@ -14,6 +14,8 @@ pub struct AMM {
     pub token_amm: FungibleToken,
     pub token_a: (FungibleToken, Option<TokenInfo>),
     pub token_b: (FungibleToken, Option<TokenInfo>),
+    account_id_token_a: AccountId,
+    account_id_token_b: AccountId,
 }
 
 fn init_token(account_id: &AccountId, prefix: Vec<u8>) -> FungibleToken {
@@ -35,14 +37,16 @@ impl AMM {
     #[init]
     pub fn new(owner_id: AccountId, token_a_id: AccountId, token_b_id: AccountId) -> Self {
         assert!(!env::state_exists(), "Already initialized");
-        let ft_a = init_token(&token_a_id, b"a".to_vec());
-        let ft_b = init_token(&token_b_id, b"b".to_vec());
+        let ft_a = init_token(&owner_id, b"a".to_vec());
+        let ft_b = init_token(&owner_id, b"b".to_vec());
         let token_amm = init_token(&owner_id, b"amm".to_vec());
 
         Self {
             token_amm,
             token_a: (ft_a, None),
             token_b: (ft_b, None),
+            account_id_token_a: token_a_id,
+            account_id_token_b: token_b_id,
         }
     }
 
@@ -138,12 +142,9 @@ impl AMM {
     }
 
     fn get_token_by_name(&mut self, token: AccountId) -> &mut (FungibleToken, Option<TokenInfo>) {
-        let a = self.token_a.0.accounts.get(&token);
-        let b = self.token_b.0.accounts.get(&token);
-
-        if a.is_some() {
+        if self.account_id_token_a.eq(&token) {
             &mut self.token_a
-        } else if b.is_some() {
+        } else if self.account_id_token_b.eq(&token) {
             &mut self.token_b
         } else {
             panic!("Token not supported");
