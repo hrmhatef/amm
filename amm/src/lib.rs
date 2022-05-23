@@ -14,8 +14,8 @@ use utils::{add_decimals, calc_dy, remove_decimals};
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct AMM {
     pub token_amm: FungibleToken,
-    pub token_a: (FungibleToken, Option<TokenInfo>),
-    pub token_b: (FungibleToken, Option<TokenInfo>),
+    pub token_a: (FungibleToken, Option<FungibleTokenMetadata>),
+    pub token_b: (FungibleToken, Option<FungibleTokenMetadata>),
     account_id_token_a: AccountId,
     account_id_token_b: AccountId,
 }
@@ -24,14 +24,6 @@ fn init_token(account_id: &AccountId, prefix: Vec<u8>) -> FungibleToken {
     let mut a = FungibleToken::new(prefix);
     a.internal_register_account(account_id);
     a
-}
-
-#[near_bindgen]
-#[derive(Debug, PartialEq, Clone, BorshDeserialize, BorshSerialize, PanicOnDefault)]
-pub struct TokenInfo {
-    name: String,
-    symbol: String,
-    decimals: u8,
 }
 
 #[near_bindgen]
@@ -52,19 +44,29 @@ impl AMM {
         }
     }
 
-    pub fn ft_metadata_a(&self) -> TokenInfo {
+    pub fn ft_metadata_a(&self) -> String {
         if self.token_a().is_none() {
             panic!("There is no metadata");
         } else {
-            self.token_a.1.clone().unwrap()
+            let meta = self.token_a.1.clone().unwrap();
+            json!({
+                "name": meta.name,
+                "decimals": meta.decimals
+            })
+            .to_string()
         }
     }
 
-    pub fn ft_metadata_b(&self) -> TokenInfo {
+    pub fn ft_metadata_b(&self) -> String {
         if self.token_b().is_none() {
             panic!("There is no metadata");
         } else {
-            self.token_b.1.clone().unwrap()
+            let meta = self.token_b.1.clone().unwrap();
+            json!({
+                "name": meta.name,
+                "decimals": meta.decimals
+            })
+            .to_string()
         }
     }
 
@@ -72,11 +74,14 @@ impl AMM {
         if self.token_a().is_some() {
             panic!("The token has metadata");
         } else {
-            let info = meta.into();
-            if self.token_b().is_some() && info == *self.token_b().unwrap() {
+            if self.token_b().is_some()
+                && meta.name == *self.token_b().unwrap().name
+                && meta.symbol == *self.token_b().unwrap().symbol
+                && meta.decimals == self.token_b().unwrap().decimals
+            {
                 panic!("Same token is not acceptable");
             }
-            self.token_a.1 = Some(info);
+            self.token_a.1 = Some(meta);
         }
     }
 
@@ -84,11 +89,14 @@ impl AMM {
         if self.token_b().is_some() {
             panic!("The token has metadata");
         } else {
-            let info = TokenInfo::from(meta);
-            if self.token_a().is_some() && info == *self.token_a().unwrap() {
+            if self.token_a().is_some()
+                && meta.name == *self.token_a().unwrap().name
+                && meta.symbol == *self.token_a().unwrap().symbol
+                && meta.decimals == self.token_a().unwrap().decimals
+            {
                 panic!("Same token is not acceptable");
             }
-            self.token_b.1 = Some(info);
+            self.token_b.1 = Some(meta);
         }
     }
 
@@ -99,7 +107,8 @@ impl AMM {
         memo: Option<String>,
     ) {
         self.check_meta();
-        let token = self.get_token_by_name(token_name);
+
+        let token = self.get_token_by_name_as_ref(&token_name);
         let pool_owner_id = env::current_account_id();
         let payer_id = env::predecessor_account_id();
         if !pool_owner_id.eq(&payer_id) {
@@ -184,11 +193,11 @@ impl AMM {
         U128::from(buy_amount)
     }
 
-    fn token_a(&self) -> Option<&TokenInfo> {
+    fn token_a(&self) -> Option<&FungibleTokenMetadata> {
         self.token_a.1.as_ref()
     }
 
-    fn token_b(&self) -> Option<&TokenInfo> {
+    fn token_b(&self) -> Option<&FungibleTokenMetadata> {
         self.token_b.1.as_ref()
     }
 
@@ -198,23 +207,16 @@ impl AMM {
         }
     }
 
-    fn get_token_by_name(&mut self, token: AccountId) -> &mut (FungibleToken, Option<TokenInfo>) {
-        if self.account_id_token_a.eq(&token) {
+    fn get_token_by_name_as_ref(
+        &mut self,
+        token: &AccountId,
+    ) -> &mut (FungibleToken, Option<FungibleTokenMetadata>) {
+        if self.account_id_token_a.eq(token) {
             &mut self.token_a
-        } else if self.account_id_token_b.eq(&token) {
+        } else if self.account_id_token_b.eq(token) {
             &mut self.token_b
         } else {
             panic!("Token not supported");
-        }
-    }
-}
-
-impl From<FungibleTokenMetadata> for TokenInfo {
-    fn from(meta: FungibleTokenMetadata) -> Self {
-        TokenInfo {
-            name: meta.name,
-            symbol: meta.symbol,
-            decimals: meta.decimals,
         }
     }
 }
@@ -259,12 +261,12 @@ mod tests {
         amm.set_metadata_b(meta_b());
 
         assert_eq!(
-            amm.ft_metadata_b(),
-            TokenInfo {
-                name: "Example NEAR fungible token".to_string(),
-                symbol: "FTB".to_string(),
-                decimals: 8
-            }
+            amm.ft_metadata_a(),
+            json!({
+                "name": "Example NEAR fungible token".to_string(),
+                "decimals": 8
+            })
+            .to_string()
         );
     }
 
