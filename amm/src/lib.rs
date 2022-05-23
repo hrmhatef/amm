@@ -111,20 +111,16 @@ impl AMM {
         let token = self.get_token_by_name_as_ref(&token_name);
         let pool_owner_id = env::current_account_id();
         let payer_id = env::predecessor_account_id();
-        if !pool_owner_id.eq(&payer_id) {
-            panic!("You don't have right permission for this method");
-        }
 
         token
             .0
             .internal_transfer(&payer_id, &pool_owner_id, token_amount.0, memo);
-        let share = add_decimals(token_amount.0, token.1.clone().unwrap().decimals);
 
         let ticker = token.1.clone().unwrap().symbol;
-        self.token_amm.internal_deposit(&payer_id, share);
+        self.token_amm.internal_deposit(&payer_id, token_amount.0);
         log!(
             "Share {} of token {} has been added to account {}",
-            share,
+            token_amount.0,
             ticker,
             &payer_id
         );
