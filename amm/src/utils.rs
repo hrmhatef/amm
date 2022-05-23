@@ -12,6 +12,10 @@ pub fn calc_dy(x: Balance, y: Balance, amount: Balance) -> Balance {
     y - (x * y / (x + amount))
 }
 
+pub fn calc_raito(a: Balance, b: Balance, decimals: u8) -> Balance {
+    remove_decimals(add_decimals(a, decimals + 1) / b, 1)
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
@@ -47,5 +51,16 @@ mod tests {
         let y = 270_000_000_000_0;
         let dy = calc_dy(x, y, 1000_000_000);
         assert_eq!(remove_decimals(dy, 1), 0_313_916_98);
+    }
+
+    #[test]
+    fn test_calc_ratio_with_two_decimal() {
+        let x = 4_000;
+        let y = 8_000;
+        assert_eq!(0_50, calc_raito(x, y, 2));
+
+        let x = 8_000;
+        let y = 4_000;
+        assert_eq!(2_00, calc_raito(x, y, 2));
     }
 }
