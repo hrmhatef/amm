@@ -219,6 +219,19 @@ impl AMM {
             panic!("Token not supported");
         }
     }
+
+    fn get_token_by_name(
+        &self,
+        token: &AccountId,
+    ) -> &(FungibleToken, Option<FungibleTokenMetadata>) {
+        if self.account_id_token_a.eq(token) {
+            &self.token_a
+        } else if self.account_id_token_b.eq(token) {
+            &self.token_b
+        } else {
+            panic!("Token not supported");
+        }
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
