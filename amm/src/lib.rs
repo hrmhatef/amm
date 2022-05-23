@@ -1,11 +1,20 @@
 use std::cmp::max;
 
+use near_contract_standards::fungible_token::core::FungibleTokenCore;
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
+use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_contract_standards::fungible_token::FungibleToken;
-use near_sdk::{env, log, near_bindgen, AccountId, PanicOnDefault};
+use near_contract_standards::storage_management::{
+    StorageBalance, StorageBalanceBounds, StorageManagement,
+};
+use near_sdk::{
+    env, log, near_bindgen, AccountId, Gas, PanicOnDefault, PromiseOrValue, PromiseResult,
+};
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::ext_contract;
 use near_sdk::json_types::U128;
+use near_sdk::serde_json::json;
 
 mod utils;
 use utils::{add_decimals, calc_dy, remove_decimals};
@@ -24,6 +33,16 @@ fn init_token(account_id: &AccountId, prefix: Vec<u8>) -> FungibleToken {
     let mut a = FungibleToken::new(prefix);
     a.internal_register_account(account_id);
     a
+}
+
+#[ext_contract(ext_self)]
+trait SelfContract {
+    fn withdraw_tokens_callback(&mut self, token_name: String, amount: U128);
+}
+
+#[ext_contract(ext_ft)]
+trait FtContract {
+    fn ft_transfer(&self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
 #[near_bindgen]
@@ -207,6 +226,126 @@ impl AMM {
         U128::from(buy_amount)
     }
 
+    #[payable]
+    pub fn withdraw_tokens(&mut self, token_name: AccountId, amount: U128) {
+        let account_id = env::predecessor_account_id();
+        if !self.account_id_token_a.eq(&token_name) && !self.account_id_token_b.eq(&token_name) {
+            panic!("Token not supported");
+        }
+        ext_ft::ft_transfer(
+            account_id,
+            amount,
+            None,
+            token_name.clone(),
+            1,
+            Gas::from(5_000_000_000_000),
+        )
+        .then(ext_self::withdraw_tokens_callback(
+            token_name.to_string(),
+            amount,
+            env::current_account_id(),
+            0,
+            Gas::from(5_000_000_000_000),
+        ));
+    }
+
+    pub fn withdraw_tokens_callback(&mut self, token_name: AccountId, amount: U128) {
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Failed => "error!".to_string(),
+            PromiseResult::Successful(_) => {
+                // Get the user who sent the tokens
+                let account_id = env::signer_account_id();
+                let token = self.get_token_by_name_as_ref(&token_name);
+
+                // Clear sent tokens value
+                token.0.internal_withdraw(&account_id, amount.0);
+
+                "Ok".to_string()
+            }
+        };
+    }
+
+    pub fn ft_balance_of(&self, token_name: AccountId, account_id: AccountId) -> U128 {
+        if token_name == env::current_account_id() {
+            self.token_amm.ft_balance_of(account_id)
+        } else if self.account_id_token_a.eq(&token_name) {
+            self.token_a.0.ft_balance_of(account_id)
+        } else if self.account_id_token_b.eq(&token_name) {
+            self.token_b.0.ft_balance_of(account_id)
+        } else {
+            panic!("Token not supported")
+        }
+    }
+
+    #[payable]
+    #[allow(dead_code)]
+    pub fn storage_deposit(
+        &mut self,
+        token_name: AccountId,
+        account_id: AccountId,
+        registration_only: Option<bool>,
+    ) {
+        if token_name == env::current_account_id() {
+            self.token_amm
+                .storage_deposit(Some(account_id), registration_only);
+        } else {
+            let token = self.get_token_by_name_as_ref(&token_name);
+            token.0.storage_deposit(Some(account_id), registration_only);
+        }
+    }
+
+    #[payable]
+    #[allow(dead_code)]
+    fn storage_withdraw(&mut self, token_name: AccountId, amount: Option<U128>) -> StorageBalance {
+        if token_name == env::current_account_id() {
+            self.token_amm.storage_withdraw(amount)
+        } else {
+            let token = self.get_token_by_name_as_ref(&token_name);
+            token.0.storage_withdraw(amount)
+        }
+    }
+
+    #[payable]
+    #[allow(dead_code)]
+    fn storage_unregister(&mut self, token_name: AccountId, force: Option<bool>) -> bool {
+        if token_name == env::current_account_id() {
+            if let Some((_, _)) = self.token_amm.internal_storage_unregister(force) {
+                return true;
+            }
+        } else {
+            let token = self.get_token_by_name_as_ref(&token_name);
+            if let Some((_, _)) = token.0.internal_storage_unregister(force) {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[allow(dead_code)]
+    fn storage_balance_bounds(&self, token_name: AccountId) -> StorageBalanceBounds {
+        if token_name == env::current_account_id() {
+            self.token_amm.storage_balance_bounds()
+        } else {
+            let token = self.get_token_by_name(&token_name);
+            token.0.storage_balance_bounds()
+        }
+    }
+
+    #[allow(dead_code)]
+    fn storage_balance_of(
+        &self,
+        token_name: AccountId,
+        account_id: AccountId,
+    ) -> Option<StorageBalance> {
+        if token_name == env::current_account_id() {
+            self.token_amm.storage_balance_of(account_id)
+        } else {
+            let token = self.get_token_by_name(&token_name);
+            token.0.storage_balance_of(account_id)
+        }
+    }
+
     fn token_a(&self) -> Option<&FungibleTokenMetadata> {
         self.token_a.1.as_ref()
     }
@@ -245,6 +384,21 @@ impl AMM {
         } else {
             panic!("Token not supported");
         }
+    }
+}
+
+#[near_bindgen]
+impl FungibleTokenReceiver for AMM {
+    fn ft_on_transfer(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+        #[allow(unused_variables)] msg: String,
+    ) -> PromiseOrValue<U128> {
+        let token_name = &env::predecessor_account_id();
+        let token = self.get_token_by_name_as_ref(token_name);
+        token.0.internal_deposit(&sender_id, amount.0);
+        PromiseOrValue::Value(U128::from(0_u128))
     }
 }
 
