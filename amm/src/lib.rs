@@ -17,7 +17,7 @@ use near_sdk::json_types::U128;
 use near_sdk::serde_json::json;
 
 mod utils;
-use utils::{add_decimals, calc_dy, remove_decimals};
+use utils::{add_decimals, calc_dy, remove_decimals, calc_raito};
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -61,6 +61,26 @@ impl AMM {
             account_id_token_a: token_a_id,
             account_id_token_b: token_b_id,
         }
+    }
+
+    pub fn contract_info(&self) -> String {
+        self.check_meta();
+        let ticker = format!("{}/{}", self.token_a.1.clone().unwrap().symbol, self.token_b.1.clone().unwrap().symbol);
+        let token_a_decimals = self.token_a.1.clone().unwrap().decimals;
+        let token_b_decimals = self.token_b.1.clone().unwrap().decimals;
+        let pool_owner_id = env::current_account_id();
+        let a = self.token_a.0.internal_unwrap_balance_of(&pool_owner_id);
+        let b = self.token_b.0.internal_unwrap_balance_of(&pool_owner_id);
+        let max_decimals = max(token_a_decimals, token_b_decimals);
+        let a = add_decimals(a, max_decimals - token_a_decimals);
+        let b = add_decimals(b, max_decimals - token_b_decimals);
+        let ratio : U128 = calc_raito(a,b, 2).into();
+        json!({
+            "ticker": ticker,
+            "decimals": max(token_a_decimals, token_b_decimals),
+            "ratio": ratio
+        })
+        .to_string()
     }
 
     pub fn ft_metadata_a(&self) -> String {
