@@ -100,6 +100,25 @@ impl AMM {
         }
     }
 
+    pub fn exclude_token_from_pool(
+        &mut self,
+        token_name: AccountId,
+        token_amount: U128,
+        memo: Option<String>,
+    ) {
+        self.check_meta();
+        let token = self.get_token_by_name_as_ref(&token_name);
+        let predecessor_account_id = env::predecessor_account_id();
+        token.0.internal_transfer(
+            &env::current_account_id(),
+            &predecessor_account_id,
+            token_amount.0,
+            memo,
+        );
+        self.token_amm
+            .internal_withdraw(&predecessor_account_id, token_amount.0);
+    }
+
     pub fn add_token_to_pool(
         &mut self,
         token_name: AccountId,
@@ -107,7 +126,6 @@ impl AMM {
         memo: Option<String>,
     ) {
         self.check_meta();
-
         let token = self.get_token_by_name_as_ref(&token_name);
         let pool_owner_id = env::current_account_id();
         let payer_id = env::predecessor_account_id();
